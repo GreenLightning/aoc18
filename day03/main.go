@@ -17,22 +17,15 @@ type Claim struct {
 }
 
 func main() {
-	file, err := os.Open("input.txt")
-	if err != nil {
-		panic(err)
-	}
-
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
+	lines := readLines("input.txt")
 
 	var claims []Claim
 	regex := regexp.MustCompile(`#(\d+) @ (\d+),(\d+): (\d+)x(\d+)`)
 
-	for scanner.Scan() {
-		result := regex.FindStringSubmatch(scanner.Text())
+	for _, line := range lines {
+		result := regex.FindStringSubmatch(line)
 		if result == nil {
-			panic(fmt.Errorf("cannot parse claim: %s", scanner.Text()))
+			panic(fmt.Errorf("cannot parse claim: %s", line))
 		}
 		var claim Claim
 		claim.id = toInt(result[1])
@@ -78,6 +71,22 @@ func main() {
 			fmt.Println(claim.id)
 		}
 	}
+}
+
+func readLines(filename string) []string {
+	file, err := os.Open(filename)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines
 }
 
 func toInt(s string) int {

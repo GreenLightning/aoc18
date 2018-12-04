@@ -9,19 +9,7 @@ import (
 )
 
 func main() {
-	file, err := os.Open("input.txt")
-	if err != nil {
-		panic(err)
-	}
-
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	var ids []string
-	for scanner.Scan() {
-		ids = append(ids, scanner.Text())
-	}
+	ids := readLines("input.txt")
 
 	{
 		fmt.Println("--- Part One ---")
@@ -62,6 +50,22 @@ func main() {
 			}
 		}
 	}
+}
+
+func readLines(filename string) []string {
+	file, err := os.Open(filename)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines
 }
 
 func toInt(s string) int {

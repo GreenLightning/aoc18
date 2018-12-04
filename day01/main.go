@@ -8,19 +8,11 @@ import (
 )
 
 func main() {
-	file, err := os.Open("input.txt")
-	if err != nil {
-		panic(err)
-	}
+	lines := readLines("input.txt")
 
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	var changes []int
-	for scanner.Scan() {
-		line := scanner.Text()
-		changes = append(changes, toInt(line))
+	changes := make([]int, len(lines))
+	for index, line := range lines {
+		changes[index] = toInt(line)
 	}
 
 	{
@@ -49,6 +41,22 @@ func main() {
 			}
 		}
 	}
+}
+
+func readLines(filename string) []string {
+	file, err := os.Open(filename)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines
 }
 
 func toInt(s string) int {

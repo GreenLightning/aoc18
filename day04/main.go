@@ -20,19 +20,7 @@ type Guard struct {
 }
 
 func main() {
-	file, err := os.Open("input.txt")
-	if err != nil {
-		panic(err)
-	}
-
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	var lines []string
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
+	lines := readLines("input.txt")
 
 	sort.Strings(lines)
 
@@ -124,6 +112,22 @@ func main() {
 		}
 		fmt.Println(bestResult)
 	}
+}
+
+func readLines(filename string) []string {
+	file, err := os.Open(filename)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines
 }
 
 func toInt(s string) int {
