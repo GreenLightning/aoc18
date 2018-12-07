@@ -6,7 +6,6 @@ import (
 	"os"
 	"regexp"
 	"sort"
-	"strconv"
 )
 
 type Step struct {
@@ -131,19 +130,4 @@ func readLines(filename string) []string {
 		lines = append(lines, scanner.Text())
 	}
 	return lines
-}
-
-func toInt(s string) int {
-	result, err := strconv.Atoi(s)
-	if err != nil {
-		panic(err)
-	}
-	return result
-}
-
-func abs(v int) int {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
