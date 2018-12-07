@@ -97,17 +97,24 @@ func main() {
 	{
 		fmt.Println("--- Part Two ---")
 		steps := input.copy()
-		workers := 5
+		workers := make(map[string]bool)
+		workerLimit := 5
 
 		time := 0
 		for len(steps) != 0 {
-			time++
 			ready := steps.getReady()
-			for w := 0; w < workers && w < len(ready); w++ {
-				step := steps[ready[w]]
-				step.remaining--
-				if step.remaining == 0 {
-					steps.remove(ready[w])
+			for _, id := range ready {
+				if len(workers) == workerLimit {
+					break
+				}
+				workers[id] = true
+			}
+			time++
+			for id := range workers {
+				steps[id].remaining--
+				if steps[id].remaining == 0 {
+					steps.remove(id)
+					delete(workers, id)
 				}
 			}
 		}
