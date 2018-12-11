@@ -9,21 +9,17 @@ import (
 
 const N = 300
 
-func findBest(cells *[N][N]int, minSize, maxSize int) (bestX, bestY, bestSize int) {
+func findBest(cells *[N + 1][N + 1]int, minSize, maxSize int) (bestX, bestY, bestSize int) {
 	bestSum := 0
 	for size := minSize; size <= maxSize; size++ {
-		for y := 0; y <= N-size; y++ {
-			for x := 0; x <= N-size; x++ {
-				sum := 0
-				for dy := 0; dy < size; dy++ {
-					for dx := 0; dx < size; dx++ {
-						sum += cells[y+dy][x+dx]
-					}
-				}
+		offset := size - 1
+		for y := 1; y <= N-size+1; y++ {
+			for x := 1; x <= N-size+1; x++ {
+				sum := cells[y+offset][x+offset] + cells[y-1][x-1] - cells[y+offset][x-1] - cells[y-1][x+offset]
 				if sum > bestSum {
 					bestSum = sum
-					bestX = x + 1
-					bestY = y + 1
+					bestX = x
+					bestY = y
 					bestSize = size
 				}
 			}
@@ -35,13 +31,33 @@ func findBest(cells *[N][N]int, minSize, maxSize int) (bestX, bestY, bestSize in
 func main() {
 	serial := toInt(readFile("input.txt"))
 
-	var cells [N][N]int
+	var cells [N + 1][N + 1]int
 
-	for y := 0; y < N; y++ {
-		for x := 0; x < N; x++ {
-			rack := (x + 1) + 10
-			power := (rack*(y+1) + serial) * rack
+	// Calculate power levels.
+	for y := 1; y <= N; y++ {
+		for x := 1; x <= N; x++ {
+			rack := x + 10
+			power := (rack*y + serial) * rack
 			cells[y][x] = ((power / 100) % 10) - 5
+		}
+	}
+
+	// Convert to prefix sum.
+	{
+		for y := 0; y < N+1; y++ {
+			sum := 0
+			for x := 0; x < N+1; x++ {
+				sum += cells[y][x]
+				cells[y][x] = sum
+			}
+		}
+
+		for x := 0; x < N+1; x++ {
+			sum := 0
+			for y := 0; y < N+1; y++ {
+				sum += cells[y][x]
+				cells[y][x] = sum
+			}
 		}
 	}
 
