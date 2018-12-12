@@ -9,38 +9,38 @@ import (
 )
 
 type Node struct {
-	value int
-	left  *Node
-	right *Node
+	left  int
+	right int
 }
 
 func play(playerCount, lastMarble int) int {
 	scores := make([]int, playerCount)
+	nodes := make([]Node, lastMarble+1)
 
-	current := &Node{}
-	current.value = 0
-	current.left = current
-	current.right = current
+	current := 0
+	nodes[current].left = current
+	nodes[current].right = current
 
 	player := 0
 	for marble := 1; marble <= lastMarble; marble++ {
 		if marble%23 == 0 {
 			remove := current
 			for i := 0; i < 7; i++ {
-				remove = remove.left
+				remove = nodes[remove].left
 			}
-			scores[player] += marble + remove.value
-			left, right := remove.left, remove.right
-			left.right = right
-			right.left = left
-			current = remove.right
+			scores[player] += marble + remove
+			left, right := nodes[remove].left, nodes[remove].right
+			nodes[left].right = right
+			nodes[right].left = left
+			current = nodes[remove].right
 		} else {
-			insert := &Node{value: marble}
-			left, right := current.right, current.right.right
-			insert.left = left
-			insert.right = right
-			left.right = insert
-			right.left = insert
+			insert := marble
+			left := nodes[current].right
+			right := nodes[left].right
+			nodes[insert].left = left
+			nodes[insert].right = right
+			nodes[left].right = insert
+			nodes[right].left = insert
 			current = insert
 		}
 		player = (player + 1) % playerCount
