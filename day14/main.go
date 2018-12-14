@@ -10,31 +10,47 @@ import (
 func main() {
 	inputText := readFile("input.txt")
 	input := toInt(inputText)
+	inputBytes := make([]byte, len(inputText))
+	for i, digit := range inputText {
+		inputBytes[i] = byte(digit - '0')
+	}
 
-	recipes := []int{3, 7}
+	recipes := make([]byte, 2, 30000000)
+	recipes[0] = 3
+	recipes[1] = 7
 	first, second := 0, 1
 	inputFound, beforeInput := false, 0
 
-	for len(recipes) < input+10 || !inputFound {
-		new := fmt.Sprintf("%d", recipes[first]+recipes[second])
-		for _, digit := range new {
-			recipes = append(recipes, int(digit)-'0')
-			if !inputFound && len(recipes) >= len(inputText) {
-				match := true
-				for i, digit := range inputText {
-					if int(digit)-'0' != recipes[len(recipes)-len(inputText)+i] {
-						match = false
-						break
-					}
-				}
-				if match {
-					inputFound = true
-					beforeInput = len(recipes) - len(inputText)
+	addRecipe := func(score byte) {
+		recipes = append(recipes, score)
+		offset := len(recipes) - len(inputBytes)
+		if !inputFound && offset >= 0 {
+			inputFound = true
+			beforeInput = offset
+			for i, value := range inputBytes {
+				if value != recipes[offset+i] {
+					inputFound = false
+					break
 				}
 			}
 		}
-		first = (first + recipes[first] + 1) % len(recipes)
-		second = (second + recipes[second] + 1) % len(recipes)
+	}
+
+	for len(recipes) < input+10 || !inputFound {
+		sum := recipes[first] + recipes[second]
+		if sum >= 10 {
+			addRecipe(sum / 10)
+			sum -= 10
+		}
+		addRecipe(sum)
+		first = (first + int(recipes[first]) + 1)
+		for first >= len(recipes) {
+			first -= len(recipes)
+		}
+		second = (second + int(recipes[second]) + 1)
+		for second >= len(recipes) {
+			second -= len(recipes)
+		}
 	}
 
 	{
