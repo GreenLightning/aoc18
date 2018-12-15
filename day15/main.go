@@ -8,6 +8,8 @@ import (
 	"sort"
 )
 
+var deltas = []Position{{0, -1}, {-1, 0}, {1, 0}, {0, 1}} // in reading order
+
 type Position struct {
 	x, y int
 }
@@ -38,6 +40,97 @@ func (d Destination) Less(o Destination) bool {
 	return d.position.Less(o.position)
 }
 
+type SearchRequest struct {
+	start     Position
+	positions []Position
+	world     [][]byte
+}
+
+type SearchResponse struct {
+	start       Position
+	destination Destination
+}
+
+func searcher(width, height int, requests <-chan *SearchRequest, responses chan<- *SearchResponse) {
+	open := make([]Destination, 0, width*height)
+
+	reached := make([][]bool, height)
+	for y := range reached {
+		reached[y] = make([]bool, width)
+	}
+
+	for request := range requests {
+		open = open[:1]
+		open[0].position = request.start
+		open[0].distance = 1
+
+		destinations := make([]Destination, len(request.positions))
+		for i, position := range request.positions {
+			destinations[i].position = position
+			destinations[i].distance = math.MaxInt32
+		}
+
+		for len(open) != 0 {
+			var currentIndex int
+			var current Destination
+			current.distance = math.MaxInt32
+
+			for index, destination := range open {
+				if destination.distance <= current.distance {
+					currentIndex = index
+					current = destination
+				}
+			}
+
+			open[currentIndex] = open[len(open)-1]
+			open = open[:len(open)-1]
+
+			if reached[current.position.y][current.position.x] {
+				continue
+			}
+
+			reached[current.position.y][current.position.x] = true
+
+			for _, delta := range deltas {
+				p := current.position.plus(delta)
+				if request.world[p.y][p.x] == '.' {
+					open = append(open, Destination{
+						position: p,
+						distance: current.distance + 1,
+					})
+				}
+			}
+
+			for i, destination := range destinations {
+				if current.position == destination.position && current.distance < destination.distance {
+					destinations[i].distance = current.distance
+				}
+			}
+		}
+
+		var best Destination
+		best.distance = math.MaxInt32
+
+		for _, destination := range destinations {
+			if destination.Less(best) {
+				best = destination
+			}
+		}
+
+		responses <- &SearchResponse{
+			start:       request.start,
+			destination: best,
+		}
+
+		// Reset reached buffer.
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				reached[y][x] = false
+			}
+		}
+	}
+}
+
 type Unit struct {
 	character byte
 	position  Position
@@ -49,15 +142,14 @@ func main() {
 
 	height, width := len(input), len(input[0])
 
-	deltas := []Position{{0, -1}, {-1, 0}, {1, 0}, {0, 1}} // in reading order
+	requests := make(chan *SearchRequest, 4)
+	responses := make(chan *SearchResponse, 4)
 
-	reached := make([][]bool, height)
-	for y := range reached {
-		reached[y] = make([]bool, width)
+	for i := 0; i < 4; i++ {
+		go searcher(width, height, requests, responses)
 	}
 
 	for attackPower := 3; ; attackPower++ {
-
 		world := make([][]byte, height)
 		for y, line := range input {
 			world[y] = []byte(line)
@@ -86,19 +178,6 @@ func main() {
 		rounds := 0
 	combat:
 		for {
-			// fmt.Println("After round:", rounds)
-			// for y, line := range world {
-			// 	fmt.Print(string(line))
-			// 	for x := range line {
-			// 		for _, unit := range units {
-			// 			if unit.position.y == y && unit.position.x == x {
-			// 				fmt.Printf(" %c(%d)", unit.character, unit.hitPoints)
-			// 			}
-			// 		}
-			// 	}
-			// 	fmt.Println()
-			// }
-
 			// Units take their turns in reading order.
 			sort.Slice(units, func(i, j int) bool {
 				return units[i].position.Less(units[j].position)
@@ -110,8 +189,9 @@ func main() {
 				// Move!
 				{
 					var targets int
-					var inRange []Destination
+					var inRange []Position
 					var currentlyInRange bool
+
 				rangeSearch:
 					for _, target := range units {
 						if target.character != unit.character {
@@ -123,9 +203,7 @@ func main() {
 									break rangeSearch
 								}
 								if world[p.y][p.x] == '.' {
-									inRange = append(inRange, Destination{
-										position: p,
-									})
+									inRange = append(inRange, p)
 								}
 							}
 						}
@@ -140,77 +218,32 @@ func main() {
 					}
 
 					if !currentlyInRange {
-						var bestStep Position
-						var bestDestination Destination
-						bestDestination.distance = math.MaxInt32
+						searchCount := 0
 
 						for _, delta := range deltas {
 							step := unit.position.plus(delta)
 
-							if world[step.y][step.x] != '.' {
-								continue
+							if world[step.y][step.x] == '.' {
+								requests <- &SearchRequest{
+									start:     step,
+									positions: inRange,
+									world:     world,
+								}
+								searchCount++
 							}
+						}
 
-							var open []Destination
-							open = append(open, Destination{
-								position: step,
-								distance: 1,
-							})
+						var bestStep Position
+						var bestDestination Destination
+						bestDestination.distance = math.MaxInt32
 
-							for i := range inRange {
-								inRange[i].distance = math.MaxInt32
-							}
-
-							for y := 0; y < height; y++ {
-								for x := 0; x < width; x++ {
-									reached[y][x] = false
-								}
-							}
-
-							for len(open) != 0 {
-								minIndex := -1
-								minDistance := math.MaxInt32
-								for index, dest := range open {
-									if dest.distance <= minDistance {
-										minIndex = index
-										minDistance = dest.distance
-									}
-								}
-
-								current := open[minIndex]
-								for i := minIndex; i < len(open)-1; i++ {
-									open[i] = open[i+1]
-								}
-								open = open[:len(open)-1]
-
-								if reached[current.position.y][current.position.x] {
-									continue
-								}
-
-								reached[current.position.y][current.position.x] = true
-
-								for _, delta := range deltas {
-									p := current.position.plus(delta)
-									if world[p.y][p.x] == '.' {
-										open = append(open, Destination{
-											position: p,
-											distance: current.distance + 1,
-										})
-									}
-								}
-
-								for i, dest := range inRange {
-									if current.position == dest.position && current.distance < dest.distance {
-										inRange[i].distance = current.distance
-									}
-								}
-							}
-
-							for _, destination := range inRange {
-								if destination.Less(bestDestination) {
-									bestStep = step
-									bestDestination = destination
-								}
+						for i := 0; i < searchCount; i++ {
+							response := <-responses
+							if response.destination.Less(bestDestination) {
+								bestStep = response.start
+								bestDestination = response.destination
+							} else if response.destination == bestDestination && response.start.Less(bestStep) {
+								bestStep = response.start
 							}
 						}
 
