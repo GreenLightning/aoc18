@@ -31,6 +31,13 @@ type Destination struct {
 	distance int
 }
 
+func (d Destination) Less(o Destination) bool {
+	if d.distance != o.distance {
+		return d.distance < o.distance
+	}
+	return d.position.Less(o.position)
+}
+
 type Unit struct {
 	character byte
 	position  Position
@@ -102,34 +109,30 @@ func main() {
 
 				// Move!
 				{
-					var targets []*Unit
-					for otherIndex, other := range units {
-						if otherIndex != unitIndex && other.character != unit.character {
-							targets = append(targets, other)
-						}
-					}
-
-					if len(targets) == 0 {
-						break combat
-					}
-
+					var targets int
 					var inRange []Destination
 					var currentlyInRange bool
 				rangeSearch:
-					for _, target := range targets {
-						for _, delta := range deltas {
-							p := target.position.plus(delta)
-							if p == unit.position {
-								currentlyInRange = true
-								break rangeSearch
-							}
-							if world[p.y][p.x] == '.' {
-								inRange = append(inRange, Destination{
-									position: p,
-									distance: math.MaxInt32,
-								})
+					for _, target := range units {
+						if target.character != unit.character {
+							targets++
+							for _, delta := range deltas {
+								p := target.position.plus(delta)
+								if p == unit.position {
+									currentlyInRange = true
+									break rangeSearch
+								}
+								if world[p.y][p.x] == '.' {
+									inRange = append(inRange, Destination{
+										position: p,
+									})
+								}
 							}
 						}
+					}
+
+					if targets == 0 {
+						break combat
 					}
 
 					if !currentlyInRange && len(inRange) == 0 {
@@ -137,80 +140,26 @@ func main() {
 					}
 
 					if !currentlyInRange {
-						var open []Destination
-
-						for _, delta := range deltas {
-							p := unit.position.plus(delta)
-							if world[p.y][p.x] == '.' {
-								open = append(open, Destination{
-									position: p,
-									distance: 1,
-								})
-							}
-						}
-
-						for y := 0; y < height; y++ {
-							for x := 0; x < width; x++ {
-								reached[y][x] = false
-							}
-						}
-
-						for len(open) != 0 {
-							current := open[0]
-							open = open[1:]
-
-							if reached[current.position.y][current.position.x] {
-								continue
-							}
-
-							reached[current.position.y][current.position.x] = true
-
-							for _, delta := range deltas {
-								p := current.position.plus(delta)
-								if world[p.y][p.x] == '.' {
-									open = append(open, Destination{
-										position: p,
-										distance: current.distance + 1,
-									})
-								}
-							}
-
-							sort.Slice(open, func(i, j int) bool {
-								return open[i].distance < open[j].distance
-							})
-
-							for i, dest := range inRange {
-								if current.position == dest.position && current.distance < dest.distance {
-									inRange[i].distance = current.distance
-								}
-							}
-						}
-
-						sort.Slice(inRange, func(i, j int) bool {
-							if inRange[i].distance != inRange[j].distance {
-								return inRange[i].distance < inRange[j].distance
-							}
-							return inRange[i].position.Less(inRange[j].position)
-						})
-
-						destination := inRange[0]
-						if destination.distance == math.MaxInt32 {
-							continue // with the next unit
-						}
+						var bestStep Position
+						var bestDestination Destination
+						bestDestination.distance = math.MaxInt32
 
 						for _, delta := range deltas {
 							step := unit.position.plus(delta)
-							dest := destination
-							dest.distance = math.MaxInt32
 
 							if world[step.y][step.x] != '.' {
 								continue
 							}
 
+							var open []Destination
 							open = append(open, Destination{
 								position: step,
 								distance: 1,
 							})
+
+							for i := range inRange {
+								inRange[i].distance = math.MaxInt32
+							}
 
 							for y := 0; y < height; y++ {
 								for x := 0; x < width; x++ {
@@ -219,8 +168,20 @@ func main() {
 							}
 
 							for len(open) != 0 {
-								current := open[0]
-								open = open[1:]
+								minIndex := -1
+								minDistance := math.MaxInt32
+								for index, dest := range open {
+									if dest.distance <= minDistance {
+										minIndex = index
+										minDistance = dest.distance
+									}
+								}
+
+								current := open[minIndex]
+								for i := minIndex; i < len(open)-1; i++ {
+									open[i] = open[i+1]
+								}
+								open = open[:len(open)-1]
 
 								if reached[current.position.y][current.position.x] {
 									continue
@@ -238,22 +199,28 @@ func main() {
 									}
 								}
 
-								sort.Slice(open, func(i, j int) bool {
-									return open[i].distance < open[j].distance
-								})
-
-								if current.position == dest.position && current.distance < dest.distance {
-									dest.distance = current.distance
+								for i, dest := range inRange {
+									if current.position == dest.position && current.distance < dest.distance {
+										inRange[i].distance = current.distance
+									}
 								}
 							}
 
-							if dest.distance == destination.distance {
-								world[unit.position.y][unit.position.x] = '.'
-								unit.position = step
-								world[unit.position.y][unit.position.x] = unit.character
-								break
+							for _, destination := range inRange {
+								if destination.Less(bestDestination) {
+									bestStep = step
+									bestDestination = destination
+								}
 							}
 						}
+
+						if bestDestination.distance == math.MaxInt32 {
+							continue // with the next unit
+						}
+
+						world[unit.position.y][unit.position.x] = '.'
+						unit.position = bestStep
+						world[unit.position.y][unit.position.x] = unit.character
 					}
 				}
 
