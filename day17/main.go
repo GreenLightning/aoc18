@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"math/rand"
 	"os"
 	"regexp"
 	"strconv"
@@ -11,13 +10,23 @@ import (
 
 const N = 2000
 
+// The world should be initialized with sand, so SAND must be 0. Things that
+// block the flow, i.e. CLAY and WATER have the least significant bit set, so
+// that blocking can be checked using bit tests.
+const (
+	SAND    = 0 // .
+	CLAY    = 1 // #
+	WETSAND = 2 // |
+	WATER   = 3 // ~
+)
+
+type Particle struct {
+	x, y int
+}
+
 func main() {
 	lines := readLines("input.txt")
 
-	// 0 sand
-	// 1 clay
-	// 10 passed
-	// 11 settled
 	var world [N][N]byte
 
 	minY, maxY := N, 0
@@ -30,7 +39,7 @@ func main() {
 			x := toInt(result[1])
 			start, end := toInt(result[2]), toInt(result[3])
 			for y := start; y <= end; y++ {
-				world[y][x] = 1
+				world[y][x] = CLAY
 			}
 			if start < minY {
 				minY = start
@@ -41,7 +50,7 @@ func main() {
 			y := toInt(result[1])
 			start, end := toInt(result[2]), toInt(result[3])
 			for x := start; x <= end; x++ {
-				world[y][x] = 1
+				world[y][x] = CLAY
 			}
 			if y < minY {
 				minY = y
@@ -53,87 +62,71 @@ func main() {
 		}
 	}
 
-	unchangedCount := 0
-	for unchangedCount < 100 {
-		x, y := 500, 0
-		changed := false
-		backing := false
-		left := (rand.Int31n(2) == 0)
-	particle:
-		for {
-			if world[y][x] != 10 {
-				changed = true
-			}
+	var particles []Particle
+	particles = append(particles, Particle{x: 500, y: 0})
+	for len(particles) != 0 {
+		particle := particles[len(particles)-1]
+		particles = particles[:len(particles)-1]
 
-			world[y][x] = 10
+		// Mark current position.
+		world[particle.y][particle.x] = WETSAND
 
-			if y == N-1 {
-				break
-			}
-
-			if world[y+1][x]&1 == 0 {
-				backing = false
-				left = (rand.Int31n(2) == 0)
-				y++
-				continue
-			}
-
-			if world[y+1][x] == 11 {
-				for xx := 0; ; xx++ {
-					if world[y+1][x+xx]&1 == 0 {
-						changed = true
-						world[y+1][x+xx] = 11
-						break particle
-					}
-					if world[y+1][x+xx] != 11 {
-						break
-					}
-				}
-				for xx := 0; ; xx++ {
-					if world[y+1][x-xx]&1 == 0 {
-						changed = true
-						world[y+1][x-xx] = 11
-						break particle
-					}
-					if world[y+1][x-xx] != 11 {
-						break
-					}
-				}
-			}
-
-			if left {
-				if !backing {
-					if world[y][x-1]&1 == 0 {
-						x--
-						continue
-					}
-					backing = true
-				}
-				if world[y][x+1]&1 == 0 {
-					x++
-					continue
-				}
-			} else {
-				if !backing {
-					if world[y][x+1]&1 == 0 {
-						x++
-						continue
-					}
-					backing = true
-				}
-				if world[y][x-1]&1 == 0 {
-					x--
-					continue
-				}
-			}
-
-			changed = true
-			world[y][x] = 11
-			break
+		// Fall down unitl we hit a blocking surface.
+		for particle.y+1 < N && world[particle.y+1][particle.x]&1 == 0 {
+			particle.y++
+			world[particle.y][particle.x] = WETSAND
 		}
 
-		if !changed {
-			unchangedCount++
+		// Stop if we reach the bottom of the simulation area.
+		if particle.y == N-1 {
+			continue
+		}
+
+		left, right := 1, 1
+		leftBlocked, rightBlocked := false, false
+
+		// Spread to the left.
+		for {
+			if world[particle.y][particle.x-left]&1 != 0 {
+				leftBlocked = true
+				break
+			}
+			if world[particle.y+1][particle.x-left]&1 == 0 {
+				break
+			}
+			world[particle.y][particle.x-left] = WETSAND
+			left++
+		}
+
+		// Spread to the right.
+		for {
+			if world[particle.y][particle.x+right]&1 != 0 {
+				rightBlocked = true
+				break
+			}
+			if world[particle.y+1][particle.x+right]&1 == 0 {
+				break
+			}
+			world[particle.y][particle.x+right] = WETSAND
+			right++
+		}
+
+		// If we are enclosed, fill everything with water and repeat the
+		// process one tile up from where we came from.
+		if leftBlocked && rightBlocked {
+			for offset := -left + 1; offset < right; offset++ {
+				world[particle.y][particle.x+offset] = WATER
+			}
+			particles = append(particles, Particle{x: particle.x, y: particle.y - 1})
+			continue
+		}
+
+		// Otherwise spawn particles on the free ends.
+		if !leftBlocked {
+			particles = append(particles, Particle{x: particle.x - left, y: particle.y})
+		}
+		if !rightBlocked {
+			particles = append(particles, Particle{x: particle.x + right, y: particle.y})
 		}
 	}
 
@@ -144,9 +137,9 @@ func main() {
 		if y >= minY && y <= maxY {
 			for x := 0; x < N; x++ {
 				switch world[y][x] {
-				case 10:
+				case WETSAND:
 					passedCount++
-				case 11:
+				case WATER:
 					settledCount++
 				}
 			}
