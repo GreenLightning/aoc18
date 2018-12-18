@@ -151,8 +151,20 @@ func main() {
 		}
 
 		if looper != nil {
-			for ; iterations < maxIterations; iterations++ {
+			base := looper
+			count := 0
+			for iterations < maxIterations {
 				looper = looper.next
+				iterations++
+				count++
+				if looper == base {
+					break
+				}
+			}
+			iterations = maxIterations - ((maxIterations - iterations) % count)
+			for iterations < maxIterations {
+				looper = looper.next
+				iterations++
 			}
 			world = looper.world
 		}
