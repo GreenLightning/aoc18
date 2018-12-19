@@ -63,6 +63,7 @@ func searcher(width, height int, requests <-chan *SearchRequest, responses chan<
 		open = open[:1]
 		open[0].position = request.start
 		open[0].distance = 1
+		reached[request.start.y][request.start.x] = true
 
 		destinations := make([]Destination, len(request.positions))
 		for i, position := range request.positions {
@@ -71,33 +72,20 @@ func searcher(width, height int, requests <-chan *SearchRequest, responses chan<
 		}
 
 		for len(open) != 0 {
-			var currentIndex int
-			var current Destination
-			current.distance = math.MaxInt32
-
-			for index, destination := range open {
-				if destination.distance <= current.distance {
-					currentIndex = index
-					current = destination
-				}
+			current := open[0]
+			for i := 0; i < len(open)-1; i++ {
+				open[i] = open[i+1]
 			}
-
-			open[currentIndex] = open[len(open)-1]
 			open = open[:len(open)-1]
-
-			if reached[current.position.y][current.position.x] {
-				continue
-			}
-
-			reached[current.position.y][current.position.x] = true
 
 			for _, delta := range deltas {
 				p := current.position.plus(delta)
-				if request.world[p.y][p.x] == '.' {
+				if !reached[p.y][p.x] && request.world[p.y][p.x] == '.' {
 					open = append(open, Destination{
 						position: p,
 						distance: current.distance + 1,
 					})
+					reached[p.y][p.x] = true
 				}
 			}
 
