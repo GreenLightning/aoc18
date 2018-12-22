@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"math"
 	"os"
 	"regexp"
 	"strconv"
@@ -121,7 +120,8 @@ func main() {
 	{
 		fmt.Println("--- Part Two ---")
 
-		var open []Destination
+		openByDistance := make(map[int][]Destination)
+		nextDistance := 0
 
 		reached := make([][][]bool, height)
 		for y := range reached {
@@ -131,51 +131,52 @@ func main() {
 			}
 		}
 
-		open = append(open, Destination{
+		start := Destination{
 			position: Position{0, 0},
 			tool:     TORCH,
 			distance: 0,
-		})
+		}
+		openByDistance[start.distance] = append(openByDistance[start.distance], start)
 
-		for len(open) != 0 {
-			var currentIndex int
-			var current Destination
-			current.distance = math.MaxInt32
-
-			for index, destination := range open {
-				if destination.distance <= current.distance {
-					currentIndex = index
-					current = destination
-				}
+		for len(openByDistance) != 0 {
+			open := openByDistance[nextDistance]
+			if len(open) == 0 {
+				delete(openByDistance, nextDistance)
+				nextDistance++
+				continue
 			}
-
-			open[currentIndex] = open[len(open)-1]
-			open = open[:len(open)-1]
+			current := open[len(open)-1]
+			openByDistance[nextDistance] = open[:len(open)-1]
 
 			if reached[current.position.y][current.position.x][current.tool] {
 				continue
 			}
-
 			reached[current.position.y][current.position.x][current.tool] = true
 
 			for tool := 0; tool < 3; tool++ {
 				if tool != current.tool && tool != world[current.position.y][current.position.x] {
-					open = append(open, Destination{
+					next := Destination{
 						position: current.position,
 						tool:     tool,
 						distance: current.distance + 7,
-					})
+					}
+					if !reached[next.position.y][next.position.x][next.tool] {
+						openByDistance[next.distance] = append(openByDistance[next.distance], next)
+					}
 				}
 			}
 
 			for _, delta := range deltas {
 				p := current.position.Plus(delta)
 				if p.x >= 0 && p.y >= 0 && current.tool != world[p.y][p.x] {
-					open = append(open, Destination{
+					next := Destination{
 						position: p,
 						tool:     current.tool,
 						distance: current.distance + 1,
-					})
+					}
+					if !reached[next.position.y][next.position.x][next.tool] {
+						openByDistance[next.distance] = append(openByDistance[next.distance], next)
+					}
 				}
 			}
 
